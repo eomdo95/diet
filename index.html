@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f0f13" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="다이어트" />
+  <title>다이어트 트래커</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f0f13;
+      --card: #1a1a24;
+      --border: #2a2a38;
+      --accent: #a3e635;
+      --text: #e8e8e8;
+      --muted: #666;
+      --green: #4ade80;
+      --red: #f87171;
+      --blue: #60a5fa;
+      --purple: #a78bfa;
+      --yellow: #fbbf24;
+    }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Noto Sans KR', sans-serif; overscroll-behavior: none; }
+    body { display: flex; justify-content: center; }
+    #root { width: 100%; max-width: 480px; min-height: 100vh; position: relative; padding-bottom: 80px; }
+    ::-webkit-scrollbar { display: none; }
+    input, select { outline: none; }
+    button { cursor: pointer; border: none; background: none; font-family: inherit; color: inherit; }
+    .card { background: var(--card); border-radius: 16px; padding: 16px; border: 1px solid var(--border); }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+    input[type=number], input[type=text], input[type=date], select {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+      color: var(--text); padding: 8px 12px; width: 100%; font-size: 14px; font-family: inherit;
+    }
+    input[type=date] { color-scheme: dark; }
+    input:focus, select:focus { border-color: var(--accent); }
+    .btn-primary { background: var(--accent); color: var(--bg); border-radius: 10px; padding: 10px 18px; font-weight: 700; font-size: 14px; transition: opacity 0.15s; font-family: inherit; }
+    .btn-primary:active { opacity: 0.75; }
+    .btn-ghost { border: 1px solid var(--border); border-radius: 10px; padding: 8px 14px; color: #999; font-size: 13px; font-family: inherit; }
+    .btn-ghost:active { border-color: var(--accent); color: var(--accent); }
+    .gap-col { display: flex; flex-direction: column; gap: 12px; }
+    #app { display: none; }
+    #loading { display: flex; height: 100vh; align-items: center; justify-content: center; color: var(--accent); font-size: 20px; }
+  </style>
+</head>
+<body>
+<div id="loading">로딩 중...</div>
+<div id="app">
+  <!-- Header -->
+  <div id="header" style="padding: 16px 20px 0; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; background:var(--bg); z-index:50; padding-bottom:8px;">
+    <div>
+      <div style="font-size:10px; color:var(--muted); letter-spacing:2px; text-transform:uppercase">Personal</div>
+      <div style="font-size:20px; font-weight:700; color:var(--accent)">다이어트 트래커</div>
+    </div>
+    <div style="text-align:right" id="header-right"></div>
+  </div>
+
+  <!-- Content -->
+  <div id="content" style="padding: 12px 16px 0;"></div>
+
+  <!-- Bottom Nav -->
+  <nav style="position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:480px; background:var(--card); border-top:1px solid var(--border); display:flex; z-index:100;">
+    <button class="nav-btn" data-tab="0" onclick="switchTab(0)" style="flex:1; padding:10px 0 12px; display:flex; flex-direction:column; align-items:center; gap:3px;">
+      <span style="font-size:20px">🏠</span><span style="font-size:10px" class="nav-label">대시보드</span>
+    </button>
+    <button class="nav-btn" data-tab="1" onclick="switchTab(1)" style="flex:1; padding:10px 0 12px; display:flex; flex-direction:column; align-items:center; gap:3px;">
+      <span style="font-size:20px">🍽️</span><span style="font-size:10px" class="nav-label">식단</span>
+    </button>
+    <button class="nav-btn" data-tab="2" onclick="switchTab(2)" style="flex:1; padding:10px 0 12px; display:flex; flex-direction:column; align-items:center; gap:3px;">
+      <span style="font-size:20px">💪</span><span style="font-size:10px" class="nav-label">운동</span>
+    </button>
+    <button class="nav-btn" data-tab="3" onclick="switchTab(3)" style="flex:1; padding:10px 0 12px; display:flex; flex-direction:column; align-items:center; gap:3px;">
+      <span style="font-size:20px">⚖️</span><span style="font-size:10px" class="nav-label">체중</span>
+    </button>
+    <button class="nav-btn" data-tab="4" onclick="switchTab(4)" style="flex:1; padding:10px 0 12px; display:flex; flex-direction:column; align-items:center; gap:3px;">
+      <span style="font-size:20px">📊</span><span style="font-size:10px" class="nav-label">통계</span>
+    </button>
+  </nav>
+</div>
+
+<script>
+// ========= DATA =========
+const FOOD_DB = [
+  { name:"공기밥", cal:300, carb:65, pro:5, fat:1 },
+  { name:"삶은 달걀", cal:78, carb:1, pro:6, fat:5 },
+  { name:"닭가슴살 100g", cal:165, carb:0, pro:31, fat:3.6 },
+  { name:"바나나", cal:89, carb:23, pro:1, fat:0.3 },
+  { name:"두부 100g", cal:76, carb:2, pro:8, fat:4 },
+  { name:"샐러드(기본)", cal:50, carb:8, pro:2, fat:1 },
+  { name:"라면", cal:500, carb:75, pro:10, fat:17 },
+  { name:"김밥 1줄", cal:340, carb:60, pro:10, fat:7 },
+  { name:"오트밀 100g", cal:389, carb:66, pro:17, fat:7 },
+  { name:"그릭요거트", cal:100, carb:6, pro:10, fat:3 },
+  { name:"우유 200ml", cal:130, carb:10, pro:7, fat:7 },
+  { name:"아메리카노", cal:10, carb:2, pro:0, fat:0 },
+  { name:"사과", cal:72, carb:19, pro:0.4, fat:0.2 },
+  { name:"고구마 100g", cal:86, carb:20, pro:1.6, fat:0.1 },
+  { name:"현미밥", cal:280, carb:60, pro:6, fat:2 },
+  { name:"된장찌개", cal:120, carb:10, pro:8, fat:5 },
+  { name:"불고기 100g", cal:200, carb:10, pro:20, fat:9 },
+  { name:"제육볶음 100g", cal:230, carb:8, pro:18, fat:14 },
+  { name:"비빔밥", cal:550, carb:80, pro:18, fat:12 },
+  { name:"순두부찌개", cal:150, carb:8, pro:12, fat:6 },
+  { name:"아보카도", cal:160, carb:9, pro:2, fat:15 },
+  { name:"견과류 한줌", cal:180, carb:6, pro:5, fat:16 },
+  { name:"단백질쉐이크", cal:150, carb:10, pro:25, fat:3 },
+];
+
+const WORKOUT_DB = [
+  { name:"걷기 30분", cal:150, type:"유산소" },
+  { name:"조깅 30분", cal:300, type:"유산소" },
+  { name:"러닝 30분", cal:400, type:"유산소" },
+  { name:"자전거 30분", cal:250, type:"유산소" },
+  { name:"수영 30분", cal:350, type:"유산소" },
+  { name:"스쿼트 3세트", cal:100, type:"근력" },
+  { name:"푸쉬업 3세트", cal:80, type:"근력" },
+  { name:"플랭크 3세트", cal:50, type:"근력" },
+  { name:"웨이트 트레이닝 1시간", cal:300, type:"근력" },
+  { name:"요가 1시간", cal:200, type:"유연성" },
+  { name:"HIIT 20분", cal:300, type:"유산소" },
+  { name:"필라테스 1시간", cal:250, type:"유연성" },
+  { name:"등산 1시간", cal:400, type:"유산소" },
+  { name:"줄넘기 20분", cal:220, type:"유산소" },
+];
+
+// ========= STATE =========
+let state = {
+  tab: 0,
+  weightLogs: [], mealLogs: [], workoutLogs: [],
+  goal: { targetWeight: 65, dailyCal: 1800, startWeight: 75 },
+  water: {},
+  mealDate: todayStr(), mealType: "아침", showMealAdd: false, mealQuery: "",
+  workoutDate: todayStr(), showWorkoutAdd: false, workoutQuery: "",
+  weightDate: todayStr(),
+  showGoalEdit: false,
+};
+
+function todayStr() { return new Date().toISOString().split("T")[0]; }
+function formatDate(d) {
+  return new Date(d).toLocaleDateString("ko-KR", { month:"short", day:"numeric", weekday:"short" });
+}
+function ls(key, fallback) {
+  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+}
+function ss(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
+
+function loadState() {
+  state.weightLogs = ls("dw", []);
+  state.mealLogs = ls("dm", []);
+  state.workoutLogs = ls("dwo", []);
+  state.goal = ls("dg", { targetWeight: 65, dailyCal: 1800, startWeight: 75 });
+  state.water = ls("dwat", {});
+}
+function saveWeights() { ss("dw", state.weightLogs); }
+function saveMeals() { ss("dm", state.mealLogs); }
+function saveWorkouts() { ss("dwo", state.workoutLogs); }
+function saveGoal() { ss("dg", state.goal); }
+function saveWater() { ss("dwat", state.water); }
+
+// ========= RENDER =========
+function render() {
+  updateHeader();
+  updateNavHighlight();
+  const content = document.getElementById("content");
+  if (state.tab === 0) content.innerHTML = renderDashboard();
+  else if (state.tab === 1) content.innerHTML = renderMealTab();
+  else if (state.tab === 2) content.innerHTML = renderWorkoutTab();
+  else if (state.tab === 3) content.innerHTML = renderWeightTab();
+  else if (state.tab === 4) content.innerHTML = renderStatsTab();
+}
+
+function updateHeader() {
+  const latestWeight = state.weightLogs.length ? state.weightLogs[state.weightLogs.length - 1].weight : null;
+  const dateStr = new Date().toLocaleDateString("ko-KR", { month:"long", day:"numeric", weekday:"long" });
+  document.getElementById("header-right").innerHTML = `
+    <div style="font-size:11px;color:var(--muted)">${dateStr}</div>
+    ${latestWeight ? `<div style="font-size:16px;font-weight:600;color:var(--accent)">${latestWeight}kg</div>` : ""}
+  `;
+}
+
+function updateNavHighlight() {
+  document.querySelectorAll(".nav-label").forEach((el, i) => {
+    el.style.color = i === state.tab ? "var(--accent)" : "var(--muted)";
+    el.style.fontWeight = i === state.tab ? "700" : "400";
+  });
+}
+
+function switchTab(t) { state.tab = t; render(); }
+
+// ========= DASHBOARD =========
+function renderDashboard() {
+  const t = todayStr();
+  const todayMeals = state.mealLogs.filter(m => m.date === t);
+  const todayWorkouts = state.workoutLogs.filter(w => w.date === t);
+  const calIn = todayMeals.reduce((s, m) => s + m.cal, 0);
+  const calOut = todayWorkouts.reduce((s, w) => s + w.cal, 0);
+  const netCal = calIn - calOut;
+  const remaining = Math.max(state.goal.dailyCal - netCal, 0);
+  const pct = Math.min(calIn / state.goal.dailyCal, 1);
+  const todayWater = state.water[t] || 0;
+  const latestWeight = state.weightLogs.length ? state.weightLogs[state.weightLogs.length - 1].weight : null;
+  const bmi = latestWeight ? (latestWeight / (1.7 * 1.7)).toFixed(1) : null;
+
+  const circ = 2 * Math.PI * 48;
+  const offset = circ * (1 - pct);
+
+  const weightToTarget = latestWeight ? Math.abs(latestWeight - state.goal.targetWeight).toFixed(1) : "?";
+  const weightDiff = latestWeight ? latestWeight - state.goal.targetWeight : 0;
+
+  const waterGlasses = Array.from({length:8}).map((_, i) => {
+    const filled = i < Math.floor(todayWater / 250);
+    const partial = !filled && i === Math.floor(todayWater / 250) && todayWater % 250 > 0;
+    const bg = filled ? "var(--accent)" : partial ? "#4a6a1a" : "var(--border)";
+    return `<div style="flex:1;height:28px;border-radius:6px;background:${bg};transition:background 0.2s"></div>`;
+  }).join("");
+
+  return `
+  <div class="gap-col">
+    <!-- Calorie Ring -->
+    <div class="card" style="display:flex;align-items:center;gap:16px;">
+      <svg width="112" height="112" viewBox="0 0 112 112">
+        <circle fill="none" stroke="var(--border)" cx="56" cy="56" r="48" stroke-width="10"/>
+        <circle fill="none" stroke="var(--accent)" stroke-linecap="round" cx="56" cy="56" r="48" stroke-width="10"
+          stroke-dasharray="${circ.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"
+          style="transform-origin:56px 56px;transform:rotate(-90deg)"/>
+        <text x="56" y="50" text-anchor="middle" fill="var(--text)" font-size="16" font-weight="700" font-family="Noto Sans KR">${calIn}</text>
+        <text x="56" y="66" text-anchor="middle" fill="var(--muted)" font-size="11" font-family="Noto Sans KR">kcal 섭취</text>
+      </svg>
+      <div style="flex:1">
+        <div style="margin-bottom:10px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:2px">목표 칼로리</div>
+          <div style="font-size:22px;font-weight:700;color:var(--accent)">${state.goal.dailyCal} kcal</div>
+        </div>
+        <div style="display:flex;gap:12px">
+          <div><div style="font-size:10px;color:var(--muted)">소모</div><div style="font-size:15px;font-weight:600;color:var(--green)">-${calOut}</div></div>
+          <div><div style="font-size:10px;color:var(--muted)">순칼로리</div><div style="font-size:15px;font-weight:600;color:${netCal > state.goal.dailyCal ? "var(--red)" : "var(--text)"}">${netCal}</div></div>
+          <div><div style="font-size:10px;color:var(--muted)">남은</div><div style="font-size:15px;font-weight:600;color:var(--accent)">${remaining}</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Water -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-weight:600">💧 물 섭취</div>
+        <div style="font-size:13px;color:var(--accent)">${todayWater}ml / 2000ml</div>
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:10px">${waterGlasses}</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-ghost" onclick="adjustWater(-250)" style="flex:1">-250ml</button>
+        <button class="btn-primary" onclick="adjustWater(250)" style="flex:2">+250ml 추가</button>
+      </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="card" style="text-align:center"><div style="font-size:24px">🏋️</div><div style="font-size:20px;font-weight:700;color:var(--accent)">${todayWorkouts.length}</div><div style="font-size:11px;color:var(--muted)">오늘 운동</div></div>
+      <div class="card" style="text-align:center"><div style="font-size:24px">🍽️</div><div style="font-size:20px;font-weight:700;color:var(--accent)">${todayMeals.length}</div><div style="font-size:11px;color:var(--muted)">오늘 식사</div></div>
+      ${latestWeight ? `<div class="card" style="text-align:center"><div style="font-size:24px">⚖️</div><div style="font-size:20px;font-weight:700;color:var(--accent)">${latestWeight}kg</div><div style="font-size:11px;color:var(--muted)">현재 체중</div></div>` : ""}
+      ${bmi ? `<div class="card" style="text-align:center"><div style="font-size:24px">📐</div><div style="font-size:20px;font-weight:700;color:var(--accent)">${bmi}</div><div style="font-size:11px;color:var(--muted)">BMI</div></div>` : ""}
+    </div>
+
+    <!-- Goal -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${state.showGoalEdit ? "12px" : "0"}">
+        <div style="font-weight:600">🎯 목표 설정</div>
+        <button class="btn-ghost" style="font-size:12px;padding:4px 10px" onclick="toggleGoalEdit()">${state.showGoalEdit ? "접기" : "수정"}</button>
+      </div>
+      ${state.showGoalEdit ? `
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div><div style="font-size:12px;color:var(--muted);margin-bottom:4px">시작 체중 (kg)</div>
+            <input type="number" step="0.1" value="${state.goal.startWeight}" onchange="updateGoalField('startWeight', parseFloat(this.value))"></div>
+          <div><div style="font-size:12px;color:var(--muted);margin-bottom:4px">목표 체중 (kg)</div>
+            <input type="number" step="0.1" value="${state.goal.targetWeight}" onchange="updateGoalField('targetWeight', parseFloat(this.value))"></div>
+          <div><div style="font-size:12px;color:var(--muted);margin-bottom:4px">일일 칼로리 목표 (kcal)</div>
+            <input type="number" value="${state.goal.dailyCal}" onchange="updateGoalField('dailyCal', parseInt(this.value))"></div>
+          <button class="btn-primary" onclick="saveGoalEdit()">저장</button>
+        </div>
+      ` : `
+        <div style="display:flex;gap:16px;margin-top:8px;flex-wrap:wrap">
+          <div><span style="font-size:11px;color:var(--muted)">시작 </span><span style="color:var(--accent);font-weight:600">${state.goal.startWeight}kg</span></div>
+          <div>→</div>
+          <div><span style="font-size:11px;color:var(--muted)">목표 </span><span style="color:var(--accent);font-weight:600">${state.goal.targetWeight}kg</span></div>
+          <div style="margin-left:auto"><span style="font-size:11px;color:var(--muted)">잔여 </span><span style="color:${weightDiff > 0 ? "var(--red)" : "var(--green)"};font-weight:600">${weightToTarget}kg</span></div>
+        </div>
+      `}
+    </div>
+  </div>`;
+}
+
+// ========= MEAL TAB =========
+function renderMealTab() {
+  const dayMeals = state.mealLogs.filter(m => m.date === state.mealDate);
+  const totalCal = dayMeals.reduce((s, m) => s + m.cal, 0);
+  const carb = dayMeals.reduce((s, m) => s + (m.carb||0), 0);
+  const pro = dayMeals.reduce((s, m) => s + (m.pro||0), 0);
+  const fat = dayMeals.reduce((s, m) => s + (m.fat||0), 0);
+
+  const filteredFoods = state.mealQuery
+    ? FOOD_DB.filter(f => f.name.includes(state.mealQuery))
+    : [];
+
+  const groups = ["아침","점심","저녁","간식"].map(type => ({
+    type, meals: dayMeals.filter(m => m.mealType === type)
+  })).filter(g => g.meals.length > 0);
+
+  const mealItems = groups.map(g => `
+    <div class="card">
+      <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:8px">${g.type}</div>
+      ${g.meals.map(m => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #1f1f2e">
+          <div>
+            <div style="font-size:14px">${m.name}</div>
+            ${m.pro > 0 ? `<div style="font-size:11px;color:var(--muted)">탄${m.carb}g · 단${m.pro}g · 지${m.fat}g</div>` : ""}
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-weight:600;color:var(--accent)">${m.cal}</span>
+            <button onclick="deleteMeal(${m.id})" style="color:var(--muted);font-size:18px;line-height:1">×</button>
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `).join("");
+
+  const searchResults = state.mealQuery ? `
+    <div style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:6px">
+      ${filteredFoods.length === 0 ? `<div style="color:var(--muted);font-size:13px;text-align:center;padding:10px">검색 결과 없음</div>` : ""}
+      ${filteredFoods.map((f, i) => `
+        <button onclick="addFoodFromDB(${i})" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;width:100%;color:var(--text)">
+          <span style="font-size:14px">${f.name}</span>
+          <span style="color:var(--accent);font-size:13px;font-weight:600">${f.cal} kcal</span>
+        </button>
+      `).join("")}
+    </div>
+  ` : "";
+
+  return `
+  <div class="gap-col">
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="date" value="${state.mealDate}" onchange="state.mealDate=this.value;render()" style="flex:1">
+      <button class="btn-primary" onclick="state.showMealAdd=!state.showMealAdd;render()">+ 추가</button>
+    </div>
+
+    <div class="card" style="display:flex;justify-content:space-around;text-align:center">
+      <div><div style="font-size:18px;font-weight:700;color:var(--accent)">${totalCal}</div><div style="font-size:10px;color:var(--muted)">kcal</div></div>
+      <div style="width:1px;background:var(--border)"></div>
+      <div><div style="font-size:15px;font-weight:600;color:var(--blue)">${carb}g</div><div style="font-size:10px;color:var(--muted)">탄수화물</div></div>
+      <div><div style="font-size:15px;font-weight:600;color:var(--green)">${pro}g</div><div style="font-size:10px;color:var(--muted)">단백질</div></div>
+      <div><div style="font-size:15px;font-weight:600;color:var(--yellow)">${fat}g</div><div style="font-size:10px;color:var(--muted)">지방</div></div>
+    </div>
+
+    ${state.showMealAdd ? `
+      <div class="card" style="display:flex;flex-direction:column;gap:10px">
+        <select onchange="state.mealType=this.value">
+          ${["아침","점심","저녁","간식"].map(t => `<option ${t===state.mealType?"selected":""}>${t}</option>`).join("")}
+        </select>
+
+        <!-- AI 분석 영역 -->
+        <div style="background:var(--bg);border:1px solid var(--accent)33;border-radius:12px;padding:12px">
+          <div style="font-size:12px;color:var(--accent);font-weight:600;margin-bottom:8px">🤖 AI 영양 자동 분석</div>
+          <div style="display:flex;gap:8px">
+            <input type="text" placeholder="예: 삼겹살 200g, 라면 1개, 치킨 반마리..." id="ai-food-input" style="flex:1"
+              onkeydown="if(event.key==='Enter')analyzeNutrition()">
+            <button class="btn-primary" onclick="analyzeNutrition()" id="ai-btn" style="white-space:nowrap;padding:8px 14px">분석</button>
+          </div>
+          <div id="ai-result" style="margin-top:0"></div>
+        </div>
+
+        <!-- DB 검색 -->
+        <div style="border-top:1px solid var(--border);padding-top:10px">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px">자주 쓰는 음식 검색</div>
+          <input type="text" placeholder="음식 검색..." value="${state.mealQuery}" oninput="state.mealQuery=this.value;render()" />
+          ${searchResults}
+        </div>
+
+        <!-- 수동 입력 -->
+        <div style="border-top:1px solid var(--border);padding-top:10px">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px">직접 입력</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <input type="text" placeholder="음식명" id="c-name">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              <input type="number" placeholder="칼로리(kcal)" id="c-cal">
+              <input type="number" placeholder="탄수화물(g)" id="c-carb">
+              <input type="number" placeholder="단백질(g)" id="c-pro">
+              <input type="number" placeholder="지방(g)" id="c-fat">
+            </div>
+            <button class="btn-primary" onclick="addCustomFood()">직접 추가</button>
+          </div>
+        </div>
+      </div>
+    ` : ""}
+
+    ${mealItems}
+    ${dayMeals.length === 0 && !state.showMealAdd ? `
+      <div style="text-align:center;color:var(--muted);padding:40px">
+        <div style="font-size:40px;margin-bottom:10px">🍽️</div>
+        <div>아직 기록된 식단이 없습니다</div>
+      </div>
+    ` : ""}
+  </div>`;
+}
+
+// ========= WORKOUT TAB =========
+function renderWorkoutTab() {
+  const dayWorkouts = state.workoutLogs.filter(w => w.date === state.workoutDate);
+  const totalCal = dayWorkouts.reduce((s, w) => s + w.cal, 0);
+  const typeColor = { "유산소":"var(--blue)", "근력":"var(--red)", "유연성":"var(--purple)" };
+
+  const filteredWorkouts = state.workoutQuery
+    ? WORKOUT_DB.filter(w => w.name.includes(state.workoutQuery) || w.type.includes(state.workoutQuery))
+    : [];
+
+  const searchResults = state.workoutQuery ? `
+    <div style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px">
+      ${filteredWorkouts.map((w, i) => `
+        <button onclick="addWorkoutFromDB(${WORKOUT_DB.indexOf(w)})" style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;width:100%;color:var(--text)">
+          <div style="text-align:left">
+            <div style="font-size:14px">${w.name}</div>
+            <span class="tag" style="background:${typeColor[w.type]}22;color:${typeColor[w.type]}">${w.type}</span>
+          </div>
+          <span style="color:var(--green);font-weight:600">-${w.cal} kcal</span>
+        </button>
+      `).join("")}
+    </div>
+  ` : "";
+
+  return `
+  <div class="gap-col">
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="date" value="${state.workoutDate}" onchange="state.workoutDate=this.value;render()" style="flex:1">
+      <button class="btn-primary" onclick="state.showWorkoutAdd=!state.showWorkoutAdd;render()">+ 추가</button>
+    </div>
+
+    ${totalCal > 0 ? `
+      <div class="card" style="text-align:center">
+        <div style="font-size:28px;font-weight:700;color:var(--green)">🔥 ${totalCal} kcal</div>
+        <div style="font-size:11px;color:var(--muted)">오늘 소모 칼로리</div>
+      </div>
+    ` : ""}
+
+    ${state.showWorkoutAdd ? `
+      <div class="card" style="display:flex;flex-direction:column;gap:10px">
+        <input type="text" placeholder="운동 검색 (예: 조깅, 근력)" value="${state.workoutQuery}" oninput="state.workoutQuery=this.value;render()">
+        ${searchResults}
+        <div style="border-top:1px solid var(--border);padding-top:10px">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px">직접 입력</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <input type="text" placeholder="운동명" id="wo-name">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              <input type="number" placeholder="시간(분)" id="wo-dur">
+              <input type="number" placeholder="소모 칼로리" id="wo-cal">
+            </div>
+            <select id="wo-type">
+              <option>유산소</option><option>근력</option><option>유연성</option>
+            </select>
+            <button class="btn-primary" onclick="addCustomWorkout()">추가</button>
+          </div>
+        </div>
+      </div>
+    ` : ""}
+
+    ${dayWorkouts.map(w => `
+      <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:14px;font-weight:600">${w.name}</div>
+          <span class="tag" style="background:${(typeColor[w.type]||"var(--accent)")}22;color:${typeColor[w.type]||"var(--accent)"}">${w.type}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="text-align:right"><div style="color:var(--green);font-weight:700">-${w.cal}</div><div style="font-size:10px;color:var(--muted)">kcal</div></div>
+          <button onclick="deleteWorkout(${w.id})" style="color:var(--muted);font-size:18px">×</button>
+        </div>
+      </div>
+    `).join("")}
+
+    ${dayWorkouts.length === 0 && !state.showWorkoutAdd ? `
+      <div style="text-align:center;color:var(--muted);padding:40px">
+        <div style="font-size:40px;margin-bottom:10px">💪</div>
+        <div>오늘 운동 기록을 추가해보세요</div>
+      </div>
+    ` : ""}
+  </div>`;
+}
+
+// ========= WEIGHT TAB =========
+function renderWeightTab() {
+  const latest = state.weightLogs.length ? state.weightLogs[state.weightLogs.length - 1].weight : null;
+  const first = state.weightLogs.length ? state.weightLogs[0].weight : null;
+  const change = first && latest ? (latest - first).toFixed(1) : null;
+
+  const chartSvg = state.weightLogs.length > 1 ? renderWeightChartSVG() : "";
+
+  return `
+  <div class="gap-col">
+    <div class="card" style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:13px;font-weight:600">체중 기록</div>
+      <input type="date" value="${state.weightDate}" onchange="state.weightDate=this.value">
+      <div style="position:relative">
+        <input type="number" placeholder="체중 입력" step="0.1" id="w-val" style="padding-right:40px">
+        <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px">kg</span>
+      </div>
+      <input type="text" placeholder="메모 (선택)" id="w-note">
+      <button class="btn-primary" onclick="addWeight()">기록하기</button>
+    </div>
+
+    ${latest ? `
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div class="card" style="text-align:center"><div style="font-size:16px;font-weight:700">${latest}kg</div><div style="font-size:10px;color:var(--muted)">현재</div></div>
+        <div class="card" style="text-align:center"><div style="font-size:16px;font-weight:700;color:${state.goal.targetWeight < latest ? "var(--red)" : "var(--green)"}">${state.goal.targetWeight}kg</div><div style="font-size:10px;color:var(--muted)">목표</div></div>
+        <div class="card" style="text-align:center"><div style="font-size:16px;font-weight:700;color:${change > 0 ? "var(--red)" : "var(--green)"}">${change > 0 ? "+" : ""}${change}kg</div><div style="font-size:10px;color:var(--muted)">총 변화</div></div>
+      </div>
+    ` : ""}
+
+    ${chartSvg ? `<div class="card"><div style="font-size:13px;font-weight:600;margin-bottom:8px">최근 체중 추이</div>${chartSvg}</div>` : ""}
+
+    <div class="card">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px">기록 내역</div>
+      ${[...state.weightLogs].reverse().slice(0, 20).map(w => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #1f1f2e">
+          <div>
+            <div style="font-size:13px">${formatDate(w.date)}</div>
+            ${w.note ? `<div style="font-size:11px;color:var(--muted)">${w.note}</div>` : ""}
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-weight:600;color:var(--accent)">${w.weight}kg</span>
+            <button onclick="deleteWeight('${w.date}')" style="color:var(--muted);font-size:18px">×</button>
+          </div>
+        </div>
+      `).join("")}
+      ${state.weightLogs.length === 0 ? `<div style="text-align:center;color:var(--muted);padding:20px">아직 기록이 없습니다</div>` : ""}
+    </div>
+  </div>`;
+}
+
+function renderWeightChartSVG() {
+  const logs = state.weightLogs.slice(-14);
+  const weights = logs.map(l => l.weight);
+  const min = Math.min(...weights) - 1;
+  const max = Math.max(...weights) + 1;
+  const W = 300, H = 90;
+  const toY = w => H - ((w - min) / (max - min)) * H;
+  const toX = i => logs.length > 1 ? (i / (logs.length - 1)) * W : W / 2;
+
+  const path = logs.map((l, i) => `${i === 0 ? "M" : "L"} ${toX(i).toFixed(1)} ${toY(l.weight).toFixed(1)}`).join(" ");
+  const goalY = toY(state.goal.targetWeight);
+  const dots = logs.map((l, i) => `<circle cx="${toX(i).toFixed(1)}" cy="${toY(l.weight).toFixed(1)}" r="3" fill="var(--accent)"/>`).join("");
+
+  return `
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;overflow:visible">
+      ${goalY >= 0 && goalY <= H ? `
+        <line x1="0" y1="${goalY.toFixed(1)}" x2="${W}" y2="${goalY.toFixed(1)}" stroke="#a3e63555" stroke-dasharray="4 4" stroke-width="1"/>
+        <text x="${W-2}" y="${(goalY-4).toFixed(1)}" text-anchor="end" fill="var(--accent)" font-size="9" font-family="Noto Sans KR">목표</text>
+      ` : ""}
+      <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      ${dots}
+    </svg>`;
+}
+
+// ========= STATS TAB =========
+function renderStatsTab() {
+  const days7 = Array.from({length:7}).map((_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6 - i));
+    return d.toISOString().split("T")[0];
+  });
+
+  const weekData = days7.map(d => ({
+    date: d,
+    label: new Date(d).toLocaleDateString("ko-KR", {weekday:"short"}),
+    cal: state.mealLogs.filter(m => m.date === d).reduce((s, m) => s + m.cal, 0),
+    burned: state.workoutLogs.filter(w => w.date === d).reduce((s, w) => s + w.cal, 0),
+  }));
+
+  const maxCal = Math.max(...weekData.map(w => w.cal), state.goal.dailyCal, 100);
+
+  const totalWorkouts = state.workoutLogs.length;
+  const dateCals = {};
+  state.mealLogs.forEach(m => { dateCals[m.date] = (dateCals[m.date] || 0) + m.cal; });
+  const dateKeys = Object.keys(dateCals);
+  const avgCal = dateKeys.length > 0 ? Math.round(dateKeys.reduce((s, k) => s + dateCals[k], 0) / dateKeys.length) : 0;
+
+  // Streak
+  let streak = 0;
+  const dCheck = new Date();
+  while (true) {
+    const key = dCheck.toISOString().split("T")[0];
+    const hasData = state.weightLogs.some(w => w.date === key) || state.mealLogs.some(m => m.date === key) || state.workoutLogs.some(w => w.date === key);
+    if (hasData) { streak++; dCheck.setDate(dCheck.getDate() - 1); } else break;
+  }
+
+  const workoutTypes = {};
+  state.workoutLogs.forEach(w => { workoutTypes[w.type] = (workoutTypes[w.type]||0) + 1; });
+
+  const bars = weekData.map(d => {
+    const calH = maxCal > 0 ? (d.cal / maxCal) * 100 : 0;
+    const isToday = d.date === todayStr();
+    return `
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+        <div style="width:100%;height:100px;position:relative;display:flex;align-items:flex-end;gap:2px">
+          <div style="position:absolute;top:${100-(state.goal.dailyCal/maxCal*100)}%;left:0;right:0;height:1px;background:#a3e63555;z-index:1"></div>
+          <div style="flex:1;height:${calH.toFixed(1)}%;background:${isToday?"var(--accent)":"#3a4a20"};border-radius:3px 3px 0 0;transition:height 0.3s;min-height:${d.cal>0?"3px":"0"}"></div>
+        </div>
+        <div style="font-size:9px;color:${isToday?"var(--accent)":"var(--muted)"}">${d.label}</div>
+      </div>`;
+  }).join("");
+
+  const typeColors = { "유산소":"var(--blue)", "근력":"var(--red)", "유연성":"var(--purple)" };
+  const typeRows = Object.entries(workoutTypes).map(([type, count]) => {
+    const pct = Math.round((count/totalWorkouts)*100);
+    return `
+      <div style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:13px;color:${typeColors[type]||"var(--accent)"}">${type}</span>
+          <span style="font-size:12px;color:var(--muted)">${count}회 (${pct}%)</span>
+        </div>
+        <div style="background:var(--border);border-radius:99px;height:6px">
+          <div style="width:${pct}%;height:100%;background:${typeColors[type]||"var(--accent)"};border-radius:99px"></div>
+        </div>
+      </div>`;
+  }).join("");
+
+  const latest = state.weightLogs.length ? state.weightLogs[state.weightLogs.length-1].weight : null;
+  const wFirst = state.weightLogs.length ? state.weightLogs[0].weight : null;
+
+  return `
+  <div class="gap-col">
+    <div class="card" style="text-align:center;padding:24px">
+      <div style="font-size:40px">🔥</div>
+      <div style="font-size:36px;font-weight:700;color:var(--accent)">${streak}일</div>
+      <div style="color:var(--muted);font-size:13px">연속 기록 중</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="card" style="text-align:center"><div style="font-size:22px;font-weight:700;color:var(--accent)">${avgCal}</div><div style="font-size:11px;color:var(--muted)">평균 일일 칼로리</div></div>
+      <div class="card" style="text-align:center"><div style="font-size:22px;font-weight:700;color:var(--green)">${totalWorkouts}</div><div style="font-size:11px;color:var(--muted)">총 운동 횟수</div></div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:13px;font-weight:600;margin-bottom:12px">주간 칼로리 현황</div>
+      <div style="display:flex;gap:6px;align-items:flex-end;height:100px">${bars}</div>
+      <div style="display:flex;gap:12px;margin-top:8px">
+        <div style="display:flex;align-items:center;gap:4px"><div style="width:10px;height:10px;border-radius:2px;background:var(--accent)"></div><span style="font-size:10px;color:var(--muted)">섭취</span></div>
+        <div style="display:flex;align-items:center;gap:4px"><div style="width:10px;height:1px;background:#a3e63555"></div><span style="font-size:10px;color:var(--muted)">목표</span></div>
+      </div>
+    </div>
+
+    ${totalWorkouts > 0 ? `
+      <div class="card">
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px">운동 유형 분포</div>
+        ${typeRows}
+      </div>
+    ` : ""}
+
+    ${state.weightLogs.length >= 2 ? `
+      <div class="card">
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px">체중 변화 요약</div>
+        <div style="display:flex;justify-content:space-around;text-align:center">
+          <div><div style="font-size:16px;font-weight:700">${wFirst}kg</div><div style="font-size:10px;color:var(--muted)">시작</div></div>
+          <div><div style="font-size:28px">${latest - wFirst <= 0 ? "📉" : "📈"}</div></div>
+          <div><div style="font-size:16px;font-weight:700;color:var(--accent)">${latest}kg</div><div style="font-size:10px;color:var(--muted)">현재</div></div>
+          <div><div style="font-size:16px;font-weight:700;color:var(--accent)">${state.goal.targetWeight}kg</div><div style="font-size:10px;color:var(--muted)">목표</div></div>
+        </div>
+        <div style="margin-top:12px;padding:8px 12px;background:var(--bg);border-radius:10px">
+          <div style="font-size:12px;color:var(--muted)">목표까지</div>
+          <div style="font-size:16px;font-weight:700;color:var(--accent)">${Math.abs(latest - state.goal.targetWeight).toFixed(1)}kg 남음</div>
+        </div>
+      </div>
+    ` : ""}
+  </div>`;
+}
+
+// ========= ACTIONS =========
+function adjustWater(delta) {
+  const t = todayStr();
+  const cur = state.water[t] || 0;
+  state.water[t] = Math.max(0, cur + delta);
+  saveWater(); render();
+}
+
+function toggleGoalEdit() { state.showGoalEdit = !state.showGoalEdit; render(); }
+
+function updateGoalField(field, val) { state.goal[field] = val; }
+
+function saveGoalEdit() { saveGoal(); state.showGoalEdit = false; render(); }
+
+function addFoodFromDB(idx) {
+  const f = FOOD_DB[idx];
+  state.mealLogs.push({ id: Date.now(), date: state.mealDate, mealType: state.mealType, ...f });
+  saveMeals(); state.showMealAdd = false; state.mealQuery = ""; render();
+}
+
+function addCustomFood() {
+  const name = document.getElementById("c-name")?.value;
+  const cal = parseInt(document.getElementById("c-cal")?.value);
+  if (!name || !cal) return;
+  const carb = parseInt(document.getElementById("c-carb")?.value) || 0;
+  const pro = parseInt(document.getElementById("c-pro")?.value) || 0;
+  const fat = parseInt(document.getElementById("c-fat")?.value) || 0;
+  state.mealLogs.push({ id: Date.now(), date: state.mealDate, mealType: state.mealType, name, cal, carb, pro, fat });
+  saveMeals(); state.showMealAdd = false; state.mealQuery = ""; render();
+}
+
+function deleteMeal(id) {
+  state.mealLogs = state.mealLogs.filter(m => m.id !== id);
+  saveMeals(); render();
+}
+
+function addWorkoutFromDB(idx) {
+  const w = WORKOUT_DB[idx];
+  state.workoutLogs.push({ id: Date.now(), date: state.workoutDate, ...w });
+  saveWorkouts(); state.showWorkoutAdd = false; state.workoutQuery = ""; render();
+}
+
+function addCustomWorkout() {
+  const name = document.getElementById("wo-name")?.value;
+  const cal = parseInt(document.getElementById("wo-cal")?.value);
+  if (!name || !cal) return;
+  const dur = document.getElementById("wo-dur")?.value;
+  const type = document.getElementById("wo-type")?.value || "유산소";
+  state.workoutLogs.push({ id: Date.now(), date: state.workoutDate, name: name + (dur ? ` ${dur}분` : ""), cal, type });
+  saveWorkouts(); state.showWorkoutAdd = false; state.workoutQuery = ""; render();
+}
+
+function deleteWorkout(id) {
+  state.workoutLogs = state.workoutLogs.filter(w => w.id !== id);
+  saveWorkouts(); render();
+}
+
+function addWeight() {
+  const val = parseFloat(document.getElementById("w-val")?.value);
+  const note = document.getElementById("w-note")?.value || "";
+  if (!val) return;
+  const existing = state.weightLogs.findIndex(w => w.date === state.weightDate);
+  if (existing >= 0) {
+    state.weightLogs[existing] = { ...state.weightLogs[existing], weight: val, note };
+  } else {
+    state.weightLogs.push({ date: state.weightDate, weight: val, note });
+    state.weightLogs.sort((a, b) => a.date.localeCompare(b.date));
+  }
+  saveWeights(); render();
+}
+
+function deleteWeight(date) {
+  state.weightLogs = state.weightLogs.filter(w => w.date !== date);
+  saveWeights(); render();
+}
+
+// ========= AI NUTRITION ANALYSIS =========
+async function analyzeNutrition() {
+  const input = document.getElementById("ai-food-input");
+  const btn = document.getElementById("ai-btn");
+  const resultDiv = document.getElementById("ai-result");
+  if (!input || !input.value.trim()) return;
+
+  const foodText = input.value.trim();
+  btn.disabled = true;
+  btn.textContent = "분석 중...";
+  resultDiv.style.marginTop = "10px";
+  resultDiv.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;padding:8px 0">
+      <span style="display:inline-block;animation:spin 1s linear infinite">⏳</span> AI가 영양정보를 분석 중...
+    </div>
+    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+  `;
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        system: `당신은 영양 전문가입니다. 사용자가 입력한 음식의 영양정보를 분석해서 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 절대 포함하지 마세요.
+{"items":[{"name":"음식명","amount":"분량설명","cal":숫자,"carb":숫자,"pro":숫자,"fat":숫자}],"total":{"cal":숫자,"carb":숫자,"pro":숫자,"fat":숫자}}
+규칙: cal=칼로리(kcal), carb=탄수화물(g), pro=단백질(g), fat=지방(g). 분량 미명시시 일반적인 1인분 기준. 숫자는 소수점 1자리.`,
+        messages: [{ role: "user", content: `다음 음식의 영양정보를 분석해주세요: ${foodText}` }]
+      })
+    });
+
+    const data = await response.json();
+    const text = data.content?.[0]?.text || "";
+    const clean = text.replace(/```json|```/g, "").trim();
+    const parsed = JSON.parse(clean);
+    window._aiResults = { items: parsed.items, mealType: state.mealType, date: state.mealDate };
+
+    const itemRows = parsed.items.map((item, i) => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.name}</div>
+          <div style="font-size:11px;color:var(--muted)">${item.amount} · 탄${item.carb}g · 단${item.pro}g · 지${item.fat}g</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-left:8px;flex-shrink:0">
+          <span style="color:var(--accent);font-weight:700;font-size:13px">${item.cal}kcal</span>
+          <button id="ai-add-${i}" onclick="addAIFood(${i})" style="background:var(--accent);color:var(--bg);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;font-family:inherit">추가</button>
+        </div>
+      </div>
+    `).join("");
+
+    const totalRow = parsed.items.length > 1 ? `
+      <div style="padding:10px 0 4px;display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:13px;font-weight:700">전체 합계</div>
+        <div style="text-align:right">
+          <div style="color:var(--accent);font-weight:700">${parsed.total.cal}kcal</div>
+          <div style="font-size:11px;color:var(--muted)">탄${parsed.total.carb}g · 단${parsed.total.pro}g · 지${parsed.total.fat}g</div>
+        </div>
+      </div>
+      <button onclick="addAllAIFoods()" style="width:100%;background:var(--accent);color:var(--bg);border-radius:10px;padding:10px;font-weight:700;font-size:14px;font-family:inherit;margin-top:4px">전체 한번에 추가</button>
+    ` : "";
+
+    resultDiv.innerHTML = `<div style="background:var(--bg);border-radius:10px;padding:4px 8px">${itemRows}${totalRow}</div>`;
+
+  } catch (err) {
+    resultDiv.innerHTML = `<div style="color:var(--red);font-size:13px;padding:8px 0">⚠️ 분석 실패. 네트워크를 확인하거나 직접 입력해주세요.</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "분석";
+  }
+}
+
+function addAIFood(idx) {
+  if (!window._aiResults) return;
+  const item = window._aiResults.items[idx];
+  state.mealLogs.push({
+    id: Date.now() + idx,
+    date: window._aiResults.date,
+    mealType: window._aiResults.mealType,
+    name: item.name + (item.amount && item.amount !== "1인분" ? ` (${item.amount})` : ""),
+    cal: Math.round(item.cal), carb: Math.round(item.carb),
+    pro: Math.round(item.pro), fat: Math.round(item.fat)
+  });
+  saveMeals();
+  const btn = document.getElementById(`ai-add-${idx}`);
+  if (btn) { btn.textContent = "✓"; btn.style.background = "var(--green)"; btn.disabled = true; }
+  // Update summary bar without full re-render
+  const summary = document.querySelector("#content .card");
+  if (summary) { const dayMeals = state.mealLogs.filter(m => m.date === state.mealDate); const tc = dayMeals.reduce((s,m)=>s+m.cal,0); const tcarb = dayMeals.reduce((s,m)=>s+(m.carb||0),0); const tpro = dayMeals.reduce((s,m)=>s+(m.pro||0),0); const tfat = dayMeals.reduce((s,m)=>s+(m.fat||0),0); }
+  updateHeader();
+}
+
+function addAllAIFoods() {
+  if (!window._aiResults) return;
+  window._aiResults.items.forEach((item, i) => {
+    state.mealLogs.push({
+      id: Date.now() + i,
+      date: window._aiResults.date,
+      mealType: window._aiResults.mealType,
+      name: item.name + (item.amount && item.amount !== "1인분" ? ` (${item.amount})` : ""),
+      cal: Math.round(item.cal), carb: Math.round(item.carb),
+      pro: Math.round(item.pro), fat: Math.round(item.fat)
+    });
+  });
+  saveMeals();
+  state.showMealAdd = false;
+  window._aiResults = null;
+  render();
+}
+
+// ========= INIT =========
+window.addEventListener("DOMContentLoaded", () => {
+  loadState();
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("app").style.display = "block";
+  render();
+});
+
+// Service Worker registration
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
